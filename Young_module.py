@@ -8,7 +8,6 @@ import os
 
 def find_coefs(Xold,yold):
     """
-
     :param Xold: массив перемещений
     :param yold: массив сил
     :return: возвращает наклон графика, квадратичное отклонение, массив предсказанных перемещений
@@ -63,7 +62,7 @@ else:
 Чтение характеристик образцов из файла header.txt
 Структура файла: 
 каждое испытание - это одна строчка
-Структура строчка:
+Структура строчки:
 number type S L include comments
 number - номер испытания
 type - тип образца (продольный, поперечный и тд)
@@ -77,7 +76,7 @@ with open('data/header.txt','r',encoding='UTF-8') as f:
     for line in f.readlines():
         match line.split():
             case [number,type,S,l,include,*comments]:
-                data[int(number)]={'type':type,'include':bool(include),'S':float(S),'l':float(l),'comments':' '.join(comments)}
+                data[int(number)]={'type':type,'include':include=='True','S':float(S),'l':float(l),'comments':' '.join(comments)}
 
                 info=pd.read_csv(f"data/{int(number)}.Stop.csv",sep=';',encoding='cp1251',decimal=',',dtype=np.float64)
                 data[int(number)]['u']=info['Положение(ElectroPuls:Position) (mm)']-info['Положение(ElectroPuls:Position) (mm)'][0]
@@ -96,31 +95,36 @@ for var in data:
     data[var]['error']=round(error, -int(math.floor(math.log10(abs(error)))))
     data[var]['pred']=y_pred
 
+#запись результатов и отрисовка графиков
 
+#переменные для хранения модуля Юнга каждого типа укладки
 E_type={}
 error_type={}
 count_type={}
-
-#запись результатов и отрисовка графиков
+#переменные для нахождения среднего модуля Юнга
 count_all=0
 E_all=0
 E_all_error=0
 with open('results/results.txt','w') as f:
     for var in data:
+        #нахождение среднего модуля Юнга
+        ic(data[var]['E']*data[var]['include'])
         E_all+=data[var]['E']*data[var]['include']
         E_all_error+=data[var]['error']*data[var]['include']
         count_all+=1*data[var]['include']
 
+        #Нахождение модуля Юнга каждого типа
         if data[var]['type'] in E_type.keys():
             E_type[data[var]['type']]+=data[var]['E']*data[var]['include']
             error_type[data[var]['type']]+=data[var]['error']**2*data[var]['include']
             count_type[data[var]['type']]+=1*data[var]['include']
-        else:
-            E_type[data[var]['type']] = data[var]['E'] * data[var]['include']
-            error_type[data[var]['type']] = data[var]['error']**2 * data[var]['include']
-            count_type[data[var]['type']] = 1 * data[var]['include']
+        elif data[var]['include']:
+            E_type[data[var]['type']] = data[var]['E']
+            error_type[data[var]['type']] = data[var]['error']**2
+            count_type[data[var]['type']] = 1
         f.write(f'Эксперимент{var} E = {data[var]['E']} error = {data[var]['error']} comments: {data[var]['comments']} \n')
 
+        #отрисовка графиков
         plt.plot(data[var]['u'].values,data[var]['f'].values,label='experiment data')
         plt.plot(data[var]['u'].values[0:len(data[var]['pred'])], data[var]['pred'],label='predicted')
         plt.grid(True)
@@ -132,10 +136,12 @@ with open('results/results.txt','w') as f:
         E=round(E_type[var]/count_type[var], -int(math.floor(math.log10(abs(error)))))
         f.write(f'{var} E = {E} error = {error} \n')
 
-    error = math.sqrt(E_all_error / count_all)
-    error = round(error, -int(math.floor(math.log10(abs(error)))))
-    E = round(E_all / count_all, -int(math.floor(math.log10(abs(error)))))
-    f.write(f'Средний по всем E = {E} error = {error}')
+    if E_all != 0:
+        error = math.sqrt(E_all_error / count_all)
+        error = round(error, -int(math.floor(math.log10(abs(error)))))
+        E = round(E_all / count_all, -int(math.floor(math.log10(abs(error)))))
+        f.write(f'Средний по всем E = {E} error = {error}')
+
 
 
 
